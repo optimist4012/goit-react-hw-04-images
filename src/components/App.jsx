@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { Blocks } from 'react-loader-spinner';
 import toast, { Toaster } from 'react-hot-toast';
 import { fetchImages } from 'utils/api';
@@ -14,83 +14,68 @@ const AppStyle = {
   paddingBottom: '24px',
 };
 
-export class App extends Component {
-  state = {
-    images: [],
-    query: '',
-    page: 1,
-    isLoading: false,
-  };
+export const App = () => {
+  const [images, setImages] = useState([]);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadMore, setLoadMore] = useState(false);
 
-  async componentDidUpdate(prevProps, prevState) {
-    if (
-      prevState.query !== this.state.query ||
-      prevState.page !== this.state.page
-    ) {
-      try {
-        const queryWithoutId = this.state.query.slice(
-          this.state.query.indexOf('/') + 1
-        );
-        this.setState({ isLoading: true });
+  useEffect(() => {
+    async function getPictures() {
+      const queryString = query.slice(query.indexOf('/') + 1);
 
-        const fetchedImages = await fetchImages(
-          queryWithoutId,
-          this.state.page
-        );
+      if (queryString !== '') {
+        try {
+          setIsLoading(true);
+          const fetchedImages = await fetchImages(queryString, page);
 
-        this.setState(prevState => {
-          return {
-            images: [...prevState.images, ...fetchedImages.hits],
-            loadMore: this.state.page < Math.ceil(fetchedImages.totalHits / 12),
-          };
-        });
-      } catch (error) {
-        toast.error('Something went wrong! Please, try again :(  ');
-      } finally {
-        this.setState({ isLoading: false });
+          setImages(prevImages => [...prevImages, ...fetchedImages.hits]);
+          setLoadMore(page < Math.ceil(fetchedImages.totalHits / 12));
+        } catch (error) {
+          toast.error('Something went wrong! Please, try again :(  ');
+        } finally {
+          setIsLoading(false);
+        }
       }
     }
-  }
 
-  handleSubmit = query => {
+    getPictures();
+  }, [query, page]);
+
+  const handleSubmit = query => {
+    //Якщо рядок порожній, то викидаємо повідомлення користувачу
     if (!query.trim()) {
-      toast.error('Enter something to search');
-      return;
+      return toast.error('Enter something to search');
     }
-    this.setState(() => {
-      return {
-        images: [],
-        query: `${Date.now()}/${query}`,
-        page: 1,
-      };
-    });
+
+    // При обробці самбіту обнуляємо массив зображень в стейті
+    // та сторінку до першої
+    setImages([]);
+    setQuery(`${Date.now()}/${query}`);
+    setPage(1);
   };
 
-  handleLoadMore = () => {
-    this.setState(prevState => {
-      return { page: prevState.page + 1 };
-    });
+  const handleLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  render() {
-    const { images, isLoading, loadMore } = this.state;
-    return (
-      <div style={AppStyle}>
-        <SearchBar onSubmit={this.handleSubmit} />
-        {isLoading && (
-          <Blocks
-            visible={true}
-            height="80"
-            width="80"
-            ariaLabel="blocks-loading"
-            wrapperStyle={{}}
-            wrapperClass="blocks-wrapper"
-          />
-        )}
-        {images.length > 0 && <ImageGallery imagesList={images} />}
-        {loadMore && <Button handleClick={this.handleLoadMore} />}
-        <Toaster />
-      </div>
-    );
-  }
-}
+  return (
+    <div style={AppStyle}>
+      <SearchBar onSubmit={handleSubmit} />
+      {isLoading && (
+        <Blocks
+          visible={true}
+          height="80"
+          width="80"
+          ariaLabel="blocks-loading"
+          wrapperStyle={{}}
+          wrapperClass="blocks-wrapper"
+        />
+      )}
+      {images.length > 0 && <ImageGallery imagesList={images} />}
+      {loadMore && <Button handleClick={handleLoadMore} />}
+      <Toaster />
+    </div>
+  );
+};
